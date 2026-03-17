@@ -1,0 +1,162 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  learner
+  mentor
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  ACTIVE
+  ENDED
+}
+
+enum MeetingLevel {
+  Beginner
+  Intermidiate
+  Advanced
+}
+
+model User {
+  id                 String        @id @default(uuid())
+  firstName          String        @map("first_name")
+  lastName           String?       @default("") @map("last_name")
+  profileImageURL    String?       @map("profile_image_url")
+  email              String        @unique
+  password           String
+  salt               String
+  isVerified         Boolean?      @default(false)
+  role               String        @default("learner")
+  gender             String        @default("Other")
+  joinedCommunities  Community[]   @relation("JoinedCommunities")
+  createdCommunities Community[]   @relation("UserCommunities")
+  chatMessage        ChatMessage[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @default(now()) @updatedAt
+  meetingsScheduled  Meeting[]     @relation("MentorMeetings")
+  attendingMeetings  Meeting[]     @relation("MeetingParticipants")
+  meetingAttendee    Meeting[]     @relation("MeetingAttendees")
+  resources          Resource[]
+  posts              Post[]
+  comments           Comment[]
+  likes              Like[]
+
+  @@map("users")
+}
+
+model Community {
+  id              String        @id @default(uuid())
+  name            String        @unique
+  description     String?       @default("")
+  capacity        Int
+  maxCapacity     Int           @default(100)
+  profileImageURL String?       @default("https://github.com/shadcn.png") @map("profile_image_url")
+  skills          String[]      @default([])
+  rating          Float         @default(0.0)
+  creator         User          @relation(name: "UserCommunities", fields: [createdById], references: [id], onDelete: Cascade)
+  createdById     String
+  chat            ChatMessage[]
+  createdAt       DateTime      @default(now())
+  members         User[]        @relation("JoinedCommunities")
+  meetings        Meeting[]
+  resources       Resource[]
+}
+
+model ChatMessage {
+  id          String    @id @default(uuid())
+  content     String
+  createdAt   DateTime  @default(now())
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  communityId String
+  sender      User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  senderId    String
+
+  @@map("chatMessage")
+}
+
+model Meeting {
+  id           String        @id @default(uuid())
+  title        String
+  description  String?
+  scheduledAt  DateTime
+  duration     Float?
+  startedAt    DateTime?
+  mentorId     String
+  mentor       User          @relation(name: "MentorMeetings", fields: [mentorId], references: [id])
+  tags         String[]
+  attendees    User[]        @relation("MeetingAttendees")
+  maxAttendees Int           @default(100)
+  status       MeetingStatus @default(SCHEDULED)
+  level        MeetingLevel  @default(Beginner)
+  isStarted    Boolean       @default(false)
+  communityId  String
+  community    Community     @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  participants User[]        @relation("MeetingParticipants")
+}
+
+model Resource {
+  id          String    @id @default(uuid())
+  title       String
+  fileUrl     String    @default("")
+  tags        String[]
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  mentorId    String
+  mentor      User      @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+}
+
+model Post {
+  id        String    @id @default(uuid())
+  title     String
+  content   String
+  imageUrl  String?
+  author    User      @relation(fields: [authorId], references: [id])
+  authorId  String
+  likes     Like[]
+  comments  Comment[]
+  tags      Tag[]     @relation("PostTags")
+  createdAt DateTime  @default(now())
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  post      Post     @relation(fields: [postId], references: [id])
+  postId    String
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  post      Post     @relation(fields: [postId], references: [id])
+  postId    String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([postId, userId])
+}
+
+model Tag {
+  id    String @id @default(uuid())
+  name  String @unique
+  posts Post[] @relation("PostTags")
+}
